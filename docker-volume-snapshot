@@ -1,0 +1,28 @@
+#!/bin/sh
+
+programname=`basename "$0"`
+
+display_usage() {
+    echo "usage: $programname (create|restore) source destination"
+    echo "  create         create snapshot file from docker volume"
+    echo "  restore        restore snapshot file to docker volume"
+    echo "  source         source name"
+    echo "  destination    destination name"
+    echo
+    echo "Example:"
+    echo "docker-volume-snapshot create xyz_volume xyz_volume.tar"
+    echo "docker-volume-snapshot restore xyz_volume.tar xyz_volume"
+}
+
+case "$1" in
+    "create")
+        docker run --rm -v $2:/source -v $(pwd):/dest busybox tar cvf /dest/$3 -C /source .
+        ;;
+    "restore")
+        docker run --rm -v $3:/dest -v $(pwd):/source busybox tar xvf /source/$2 -C /dest
+        ;;
+    *)
+        display_usage
+        exit 1 # Command to come out of the program with status 1
+        ;;
+esac

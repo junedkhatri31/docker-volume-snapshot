@@ -1,2 +1,2 @@
 # docker-volume-snapshot
-Docker snapshot utility commands
+Docker volume snapshot utility commands
