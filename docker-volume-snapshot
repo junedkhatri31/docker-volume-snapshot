@@ -6,8 +6,8 @@ display_usage() {
     echo "usage: $programname (create|restore) source destination"
     echo "  create         create snapshot file from docker volume"
     echo "  restore        restore snapshot file to docker volume"
-    echo "  source         source name"
-    echo "  destination    destination name"
+    echo "  source         source path"
+    echo "  destination    destination path"
     echo
     echo "Example:"
     echo "docker-volume-snapshot create xyz_volume xyz_volume.tar"
