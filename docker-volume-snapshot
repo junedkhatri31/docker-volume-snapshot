@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash
+set -eu -o pipefail
 
 programname=`basename "$0"`
 
@@ -16,10 +17,16 @@ display_usage() {
 
 case "$1" in
     "create")
-        docker run --rm -v $2:/source -v $(pwd):/dest busybox tar cvf /dest/$3 -C /source .
+        directory=`dirname $3`
+        if [ "$directory" == "." ]; then directory=$(pwd); fi
+        filename=`basename $3`
+        docker run --rm -v $2:/source -v $directory:/dest busybox tar cvf /dest/$filename -C /source .
         ;;
     "restore")
-        docker run --rm -v $3:/dest -v $(pwd):/source busybox tar xvf /source/$2 -C /dest
+        directory=`dirname $2`
+        if [ "$directory" == "." ]; then directory=$(pwd); fi
+        filename=`basename $2`
+        docker run --rm -v $3:/dest -v $directory:/source busybox tar xvf /source/$filename -C /dest
         ;;
     *)
         display_usage
