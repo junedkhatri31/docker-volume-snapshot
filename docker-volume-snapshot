@@ -17,12 +17,14 @@ display_usage() {
 
 case "$1" in
     "create")
+        if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
         directory=`dirname $3`
         if [ "$directory" == "." ]; then directory=$(pwd); fi
         filename=`basename $3`
         docker run --rm -v $2:/source -v $directory:/dest busybox tar cvf /dest/$filename -C /source .
         ;;
     "restore")
+        if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
         directory=`dirname $2`
         if [ "$directory" == "." ]; then directory=$(pwd); fi
         filename=`basename $2`
