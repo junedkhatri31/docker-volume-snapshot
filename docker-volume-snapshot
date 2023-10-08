@@ -10,9 +10,13 @@ display_usage() {
     echo "  source         source path"
     echo "  destination    destination path"
     echo
-    echo "Example:"
+    echo "Tip: If you use the .tar.gz extention, the script will automatically use gzip compression"
+    echo
+    echo "Examples:"
     echo "docker-volume-snapshot create xyz_volume xyz_volume.tar"
+    echo "docker-volume-snapshot create xyz_volume xyz_volume.tar.gz"
     echo "docker-volume-snapshot restore xyz_volume.tar xyz_volume"
+    echo "docker-volume-snapshot restore xyz_volume.tar.gz xyz_volume"
 }
 
 is_gzipped() {

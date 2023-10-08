@@ -26,3 +26,12 @@ docker-volume-snapshot create xyz_volume xyz_volume.tar
 ```sh
 docker-volume-snapshot restore xyz_volume.tar xyz_volume
 ```
+
+## GZIP compression
+If you use the .tar.gz extention, the script will automatically use gzip compression
+```sh
+docker-volume-snapshot create xyz_volume xyz_volume.tar.gz
+```
+```sh
+docker-volume-snapshot restore xyz_volume.tar.gz xyz_volume
+```
