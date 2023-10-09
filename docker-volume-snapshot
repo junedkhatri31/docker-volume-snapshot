@@ -10,7 +10,8 @@ display_usage() {
     echo "  source         source path"
     echo "  destination    destination path"
     echo
-    echo "Tip: If you use the .tar.gz extention, the script will automatically use gzip compression"
+    echo "Tip: Supports tar's compression algorithms automatically"
+    echo "     based on the file extention, for example .tar.gz"
     echo
     echo "Examples:"
     echo "docker-volume-snapshot create xyz_volume xyz_volume.tar"
@@ -19,23 +20,13 @@ display_usage() {
     echo "docker-volume-snapshot restore xyz_volume.tar.gz xyz_volume"
 }
 
-is_gzipped() {
-    local file="$1"
-    if [[ "$file" == *.tar.gz ]]; then
-        echo "z"
-    else
-        echo ""
-    fi
-}
-
 case "$1" in
     "create")
         if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
         directory=`dirname "$3"`
         if [ "$directory" == "." ]; then directory=$(pwd); fi
         filename=`basename "$3"`
-        compression_option=$(is_gzipped "$filename")
-        docker run --rm -v "$2:/source" -v "$directory:/dest" busybox tar cvf${compression_option} "/dest/$filename" -C /source .
+        docker run --rm -v "$2:/source" -v "$directory:/dest" busybox tar cvaf "/dest/$filename" -C /source .
         ;;
     "restore")
         if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
