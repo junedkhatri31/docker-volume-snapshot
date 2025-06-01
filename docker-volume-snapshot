@@ -4,36 +4,53 @@ set -e -o pipefail
 programname=`basename "$0"`
 
 display_usage() {
-    echo "usage: $programname (create|restore) source destination"
+    echo "usage: $programname (create|restore) source [destination]"
     echo "  create         create snapshot file from docker volume"
     echo "  restore        restore snapshot file to docker volume"
     echo "  source         source path"
-    echo "  destination    destination path"
+    echo "  destination    destination path (optional)"
+    echo
+    echo "If destination is not provided:"
+    echo "  create: uses source name + .tar.gz"
+    echo "  restore: derives volume name from archive filename"
     echo
     echo "Tip: Supports tar's compression algorithms automatically"
     echo "     based on the file extention, for example .tar.gz"
     echo
     echo "Examples:"
+    echo "docker-volume-snapshot create xyz_volume"
     echo "docker-volume-snapshot create xyz_volume xyz_volume.tar"
     echo "docker-volume-snapshot create xyz_volume xyz_volume.tar.gz"
+    echo "docker-volume-snapshot restore xyz_volume.tar"
+    echo "docker-volume-snapshot restore xyz_volume.tar.gz"
     echo "docker-volume-snapshot restore xyz_volume.tar xyz_volume"
     echo "docker-volume-snapshot restore xyz_volume.tar.gz xyz_volume"
 }
 
 case "$1" in
     "create")
-        if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
-        directory=`dirname "$3"`
+        if [[ -z "$2" ]]; then display_usage; exit 1; fi
+        source="$2"
+        destination="${3:-$2.tar.gz}"
+        directory=`dirname "$destination"`
         if [ "$directory" == "." ]; then directory=$(pwd); fi
-        filename=`basename "$3"`
-        docker run --rm -v "$2:/source" -v "$directory:/dest" busybox tar cvaf "/dest/$filename" -C /source .
+        filename=`basename "$destination"`
+        docker run --rm -v "$source:/source" -v "$directory:/dest" busybox tar cvaf "/dest/$filename" -C /source .
         ;;
     "restore")
-        if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
-        directory=`dirname "$2"`
+        if [[ -z "$2" ]]; then display_usage; exit 1; fi
+        source="$2"
+        if [[ -z "$3" ]]; then
+            # Extract volume name from archive filename
+            basename_source=`basename "$source"`
+            destination="${basename_source%%.*}"
+        else
+            destination="$3"
+        fi
+        directory=`dirname "$source"`
         if [ "$directory" == "." ]; then directory=$(pwd); fi
-        filename=`basename "$2"`
-        docker run --rm -v "$3:/dest" -v "$directory:/source" busybox tar xvf "/source/$filename" -C /dest
+        filename=`basename "$source"`
+        docker run --rm -v "$destination:/dest" -v "$directory:/source" busybox tar xvf "/source/$filename" -C /dest
         ;;
     *)
         display_usage
