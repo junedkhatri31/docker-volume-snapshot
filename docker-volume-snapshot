@@ -4,15 +4,17 @@ set -e -o pipefail
 programname=`basename "$0"`
 
 display_usage() {
-    echo "usage: $programname (create|restore) source [destination]"
+    echo "usage: $programname create source [destination]"
+    echo "usage: $programname restore [source] destination"
     echo "  create         create snapshot file from docker volume"
     echo "  restore        restore snapshot file to docker volume"
     echo "  source         source path"
-    echo "  destination    destination path (optional)"
+    echo "  destination    destination path"
     echo
-    echo "If destination is not provided:"
-    echo "  create: uses source name + .tar.gz"
-    echo "  restore: derives volume name from archive filename"
+    echo "If destination is not provided for create:"
+    echo "  uses source name + .tar.gz"
+    echo "If source is not provided for restore:"
+    echo "  uses destination name + .tar.gz"
     echo
     echo "Tip: Supports tar's compression algorithms automatically"
     echo "     based on the file extention, for example .tar.gz"
@@ -21,8 +23,7 @@ display_usage() {
     echo "docker-volume-snapshot create xyz_volume"
     echo "docker-volume-snapshot create xyz_volume xyz_volume.tar"
     echo "docker-volume-snapshot create xyz_volume xyz_volume.tar.gz"
-    echo "docker-volume-snapshot restore xyz_volume.tar"
-    echo "docker-volume-snapshot restore xyz_volume.tar.gz"
+    echo "docker-volume-snapshot restore xyz_volume"
     echo "docker-volume-snapshot restore xyz_volume.tar xyz_volume"
     echo "docker-volume-snapshot restore xyz_volume.tar.gz xyz_volume"
 }
@@ -39,14 +40,17 @@ case "$1" in
         ;;
     "restore")
         if [[ -z "$2" ]]; then display_usage; exit 1; fi
-        source="$2"
+
         if [[ -z "$3" ]]; then
-            # Extract volume name from archive filename
-            basename_source=`basename "$source"`
-            destination="${basename_source%%.*}"
+            # Only one argument provided - it's the destination
+            destination="$2"
+            source="$destination.tar.gz"
         else
+            # Two arguments provided - source and destination
+            source="$2"
             destination="$3"
         fi
+
         directory=`dirname "$source"`
         if [ "$directory" == "." ]; then directory=$(pwd); fi
         filename=`basename "$source"`
