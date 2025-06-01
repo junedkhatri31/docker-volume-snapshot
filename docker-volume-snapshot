@@ -12,13 +12,24 @@ create() {
     docker run --rm -v "$source:/source" -v "$directory:/dest" busybox tar cvaf "/dest/$filename" -C /source .
 }
 
+restore() {
+    local source="$1"
+    local destination="$2"
+    local directory=`dirname "$source"`
+    if [ "$directory" == "." ]; then directory=$(pwd); fi
+    local filename=`basename "$source"`
+    docker run --rm -v "$destination:/dest" -v "$directory:/source" busybox tar xvf "/source/$filename" -C /dest
+}
+
 display_usage() {
     echo "usage: $programname create source [destination]"
     echo "usage: $programname create-all [destination]"
     echo "usage: $programname restore [source] destination"
+    echo "usage: $programname restore-all archive"
     echo "  create         create snapshot file from docker volume"
     echo "  create-all     create snapshots of all docker volumes into single archive"
     echo "  restore        restore snapshot file to docker volume"
+    echo "  restore-all    restore all volumes from combined archive"
     echo "  source         source path"
     echo "  destination    destination path"
     echo "  archive        archive path (default: docker-volumes.tar.gz)"
@@ -40,6 +51,7 @@ display_usage() {
     echo "docker-volume-snapshot restore xyz_volume"
     echo "docker-volume-snapshot restore xyz_volume.tar xyz_volume"
     echo "docker-volume-snapshot restore xyz_volume.tar.gz xyz_volume"
+    echo "docker-volume-snapshot restore-all docker-volumes.tar.gz"
 }
 
 case "$1" in
@@ -92,10 +104,32 @@ case "$1" in
             destination="$3"
         fi
 
-        directory=`dirname "$source"`
+        restore "$source" "$destination"
+        ;;
+    "restore-all")
+        if [[ -z "$2" ]]; then display_usage; exit 1; fi
+        archive="$2"
+
+        temp_dir="/tmp/docker-volume-snapshots-$$"
+        mkdir -p "$temp_dir"
+
+        directory=$(dirname "$archive")
         if [ "$directory" == "." ]; then directory=$(pwd); fi
-        filename=`basename "$source"`
-        docker run --rm -v "$destination:/dest" -v "$directory:/source" busybox tar xvf "/source/$filename" -C /dest
+        filename=$(basename "$archive")
+
+        docker run --rm -v "$directory:/source" -v "$temp_dir:/dest" busybox tar xvf "/source/$filename" -C /dest
+
+        for volume_archive in "$temp_dir"/*.tar.gz; do
+            if [ -f "$volume_archive" ]; then
+                volume_name=$(basename "$volume_archive" .tar.gz)
+                echo "Restoring volume: $volume_name from $volume_archive"
+                restore "$volume_archive" "$volume_name"
+            fi
+        done
+
+        echo "Cleaning up temporary files..."
+        rm -rf "$temp_dir"
+        echo "All volumes restored from: $archive"
         ;;
     *)
         display_usage
