@@ -3,13 +3,25 @@ set -e -o pipefail
 
 programname=`basename "$0"`
 
+create() {
+    local source="$1"
+    local destination="$2"
+    local directory=`dirname "$destination"`
+    if [ "$directory" == "." ]; then directory=$(pwd); fi
+    local filename=`basename "$destination"`
+    docker run --rm -v "$source:/source" -v "$directory:/dest" busybox tar cvaf "/dest/$filename" -C /source .
+}
+
 display_usage() {
     echo "usage: $programname create source [destination]"
+    echo "usage: $programname create-all [destination]"
     echo "usage: $programname restore [source] destination"
     echo "  create         create snapshot file from docker volume"
+    echo "  create-all     create snapshots of all docker volumes into single archive"
     echo "  restore        restore snapshot file to docker volume"
     echo "  source         source path"
     echo "  destination    destination path"
+    echo "  archive        archive path (default: docker-volumes.tar.gz)"
     echo
     echo "If destination is not provided for create:"
     echo "  uses source name + .tar.gz"
@@ -23,6 +35,8 @@ display_usage() {
     echo "docker-volume-snapshot create xyz_volume"
     echo "docker-volume-snapshot create xyz_volume xyz_volume.tar"
     echo "docker-volume-snapshot create xyz_volume xyz_volume.tar.gz"
+    echo "docker-volume-snapshot create-all"
+    echo "docker-volume-snapshot create-all all-volumes.tar.gz"
     echo "docker-volume-snapshot restore xyz_volume"
     echo "docker-volume-snapshot restore xyz_volume.tar xyz_volume"
     echo "docker-volume-snapshot restore xyz_volume.tar.gz xyz_volume"
@@ -33,10 +47,37 @@ case "$1" in
         if [[ -z "$2" ]]; then display_usage; exit 1; fi
         source="$2"
         destination="${3:-$2.tar.gz}"
-        directory=`dirname "$destination"`
+        create "$source" "$destination"
+        ;;
+    "create-all")
+        archive="${2:-docker-volumes.tar.gz}"
+
+        echo "Getting list of Docker volumes..."
+        volumes=$(docker volume ls -q)
+
+        if [ -z "$volumes" ]; then
+            echo "No Docker volumes found."
+            exit 0
+        fi
+        temp_dir="/tmp/docker-volume-snapshots-$$"
+        mkdir -p "$temp_dir"
+
+        echo "Creating individual volume snapshots..."
+        for volume in $volumes; do
+            echo "Backing up volume: $volume"
+            create "$volume" "$temp_dir/$volume.tar.gz"
+        done
+
+        echo "Creating combined archive: $archive"
+        directory=$(dirname "$archive")
         if [ "$directory" == "." ]; then directory=$(pwd); fi
-        filename=`basename "$destination"`
-        docker run --rm -v "$source:/source" -v "$directory:/dest" busybox tar cvaf "/dest/$filename" -C /source .
+        filename=$(basename "$archive")
+
+        docker run --rm -v "$temp_dir:/source" -v "$directory:/dest" busybox tar cvaf "/dest/$filename" -C /source .
+
+        echo "Cleaning up temporary files..."
+        rm -rf "$temp_dir"
+        echo "All volumes backed up to: $archive"
         ;;
     "restore")
         if [[ -z "$2" ]]; then display_usage; exit 1; fi
