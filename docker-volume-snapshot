@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e -o pipefail
 
-programname=`basename "$0"`
+programname=$(basename "$0")
 
 display_usage() {
     echo "usage: $programname (create|restore) source destination"
@@ -23,16 +23,16 @@ display_usage() {
 case "$1" in
     "create")
         if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
-        directory=`dirname "$3"`
+        directory=$(dirname "$3")
         if [ "$directory" == "." ]; then directory=$(pwd); fi
-        filename=`basename "$3"`
+        filename=$(basename "$3")
         docker run --rm -v "$2:/source" -v "$directory:/dest" busybox tar cvaf "/dest/$filename" -C /source .
         ;;
     "restore")
         if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
-        directory=`dirname "$2"`
+        directory=$(dirname "$2")
         if [ "$directory" == "." ]; then directory=$(pwd); fi
-        filename=`basename "$2"`
+        filename=$(basename "$2")
         docker run --rm -v "$3:/dest" -v "$directory:/source" busybox tar xvf "/source/$filename" -C /dest
         ;;
     *)
