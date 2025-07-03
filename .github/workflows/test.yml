@@ -1,0 +1,59 @@
+name: Test Docker Volume Snapshot
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Start Docker service
+      run: |
+        sudo systemctl start docker
+        sudo chmod 666 /var/run/docker.sock
+    
+    - name: Verify Docker is running
+      run: |
+        docker --version
+        docker info
+    
+    - name: Make docker-volume-snapshot executable
+      run: chmod +x ./docker-volume-snapshot
+    
+    - name: Run tests
+      run: ./test.sh
+    
+    - name: Test individual commands (basic smoke tests)
+      run: |
+        # Test help output
+        ./docker-volume-snapshot || true
+        
+        # Test with invalid arguments
+        ./docker-volume-snapshot invalid || true
+        
+        # Verify script syntax
+        bash -n ./docker-volume-snapshot
+        
+        # Verify test script syntax
+        bash -n ./test.sh
+    
+    - name: Cleanup test artifacts
+      if: always()
+      run: |
+        # Clean up any remaining test volumes
+        docker volume ls -q | grep -E '^test_volume_[0-9]+$' | xargs -r docker volume rm || true
+        
+        # Clean up test files
+        rm -f test_snapshot.tar test_snapshot.tar.gz || true
+        rm -f /tmp/test_snapshot.tar /tmp/test_snapshot.tar.gz || true
+        rm -rf test_output_dir || true

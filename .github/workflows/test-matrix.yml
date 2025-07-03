@@ -1,0 +1,161 @@
+name: Test Matrix - Docker Volume Snapshot
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-matrix:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-latest]
+        include:
+          - os: ubuntu-22.04
+            docker-version: "24.0"
+          - os: ubuntu-latest
+            docker-version: "latest"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Start Docker service
+      run: |
+        sudo systemctl start docker
+        sudo chmod 666 /var/run/docker.sock
+    
+    - name: Verify Docker version
+      run: |
+        echo "Testing on ${{ matrix.os }} with Docker ${{ matrix.docker-version }}"
+        docker --version
+        docker info
+    
+    - name: Make scripts executable
+      run: |
+        chmod +x ./docker-volume-snapshot
+        chmod +x ./test.sh
+    
+    - name: Run comprehensive tests
+      run: ./test.sh
+    
+    - name: Test with different file formats
+      run: |
+        # Create test volume
+        docker volume create format_test_volume
+        docker run --rm -v format_test_volume:/data busybox sh -c 'echo "format test data" > /data/test.txt'
+        
+        # Test different compression formats
+        echo "Testing .tar format..."
+        ./docker-volume-snapshot create format_test_volume format_test.tar
+        
+        echo "Testing .tar.gz format..."
+        ./docker-volume-snapshot create format_test_volume format_test.tar.gz
+        
+        echo "Testing .tar.bz2 format..."
+        ./docker-volume-snapshot create format_test_volume format_test.tar.bz2
+        
+        # Verify all files were created
+        ls -la format_test.*
+        
+        # Test restore for each format
+        for format in tar tar.gz tar.bz2; do
+          echo "Testing restore for .$format format..."
+          volume_name="restore_test_${format//./_}"
+          docker volume create "$volume_name"
+          ./docker-volume-snapshot restore "format_test.$format" "$volume_name"
+          
+          # Verify data
+          restored_data=$(docker run --rm -v "$volume_name:/data" busybox cat /data/test.txt)
+          if [[ "$restored_data" == "format test data" ]]; then
+            echo "✓ Successfully restored .$format format"
+          else
+            echo "✗ Failed to restore .$format format"
+            exit 1
+          fi
+          
+          docker volume rm "$volume_name"
+        done
+        
+        # Cleanup
+        docker volume rm format_test_volume
+        rm -f format_test.*
+    
+    - name: Test edge cases
+      run: |
+        # Test with volume names containing special characters
+        echo "Testing volume with underscores..."
+        docker volume create test_volume_with_underscores
+        docker run --rm -v test_volume_with_underscores:/data busybox sh -c 'echo "underscore test" > /data/file.txt'
+        ./docker-volume-snapshot create test_volume_with_underscores special_chars.tar
+        
+        # Test with paths containing spaces (in quotes)
+        echo "Testing paths with spaces..."
+        mkdir -p "test dir with spaces"
+        ./docker-volume-snapshot create test_volume_with_underscores "test dir with spaces/snapshot.tar"
+        
+        # Verify and cleanup
+        ls -la "test dir with spaces/snapshot.tar"
+        docker volume rm test_volume_with_underscores
+        rm -rf "test dir with spaces"
+        rm -f special_chars.tar
+    
+    - name: Performance test
+      run: |
+        # Create a larger test volume
+        echo "Creating performance test volume..."
+        docker volume create perf_test_volume
+        
+        # Add more data for performance testing
+        docker run --rm -v perf_test_volume:/data busybox sh -c '
+          for i in $(seq 1 100); do
+            echo "Performance test data line $i with some additional content to make it longer" > /data/file_$i.txt
+          done
+          mkdir -p /data/subdir1/subdir2
+          for i in $(seq 1 50); do
+            echo "Nested performance test data $i" > /data/subdir1/subdir2/nested_$i.txt
+          done
+        '
+        
+        # Time the snapshot creation
+        echo "Testing snapshot creation performance..."
+        time ./docker-volume-snapshot create perf_test_volume perf_test.tar.gz
+        
+        # Time the snapshot restoration
+        echo "Testing snapshot restoration performance..."
+        docker volume create perf_restore_volume
+        time ./docker-volume-snapshot restore perf_test.tar.gz perf_restore_volume
+        
+        # Verify some of the restored data
+        restored_count=$(docker run --rm -v perf_restore_volume:/data busybox find /data -name "file_*.txt" | wc -l)
+        if [[ "$restored_count" -eq 100 ]]; then
+          echo "✓ Performance test passed: All files restored correctly"
+        else
+          echo "✗ Performance test failed: Expected 100 files, got $restored_count"
+          exit 1
+        fi
+        
+        # Cleanup
+        docker volume rm perf_test_volume perf_restore_volume
+        rm -f perf_test.tar.gz
+    
+    - name: Cleanup test artifacts
+      if: always()
+      run: |
+        # Clean up any remaining test volumes
+        docker volume ls -q | grep -E '^(test_volume_|format_test|perf_test|restore_test)' | xargs -r docker volume rm || true
+        
+        # Clean up test files
+        rm -f test_snapshot.tar test_snapshot.tar.gz || true
+        rm -f /tmp/test_snapshot.tar /tmp/test_snapshot.tar.gz || true
+        rm -rf test_output_dir || true
+        rm -f format_test.* || true
+        rm -f special_chars.tar || true
+        rm -f perf_test.tar.gz || true
+        rm -rf "test dir with spaces" || true
