@@ -24,14 +24,25 @@ case "$1" in
     "create")
         if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
         directory=$(dirname "$3")
-        if [ "$directory" == "." ]; then directory=$(pwd); fi
+        # if the directory is not an absolute path, convert it to an absolute path
+        if [[ "$directory" != /* ]]; then
+            directory=$(realpath "$directory")
+        fi
+        # if the directory does not exist, create it
+        if [ ! -d "$directory" ]; then
+            echo "Directory does not exist, creating: $directory"
+            mkdir -p "$directory"
+        fi
         filename=$(basename "$3")
         docker run --rm -v "$2:/source" -v "$directory:/dest" busybox tar cvaf "/dest/$filename" -C /source .
         ;;
     "restore")
         if [[ -z "$2" || -z "$3" ]]; then display_usage; exit 1; fi
         directory=$(dirname "$2")
-        if [ "$directory" == "." ]; then directory=$(pwd); fi
+        # if the directory is not an absolute path, convert it to an absolute path
+        if [[ "$directory" != /* ]]; then
+            directory=$(realpath "$directory")
+        fi
         filename=$(basename "$2")
         docker run --rm -v "$3:/dest" -v "$directory:/source" busybox tar xvf "/source/$filename" -C /dest
         ;;

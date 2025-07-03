@@ -1,0 +1,38 @@
+name: Quick Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quick-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Verify Docker is running
+      run: |
+        docker --version
+        docker info
+    
+    - name: Run integration test
+      run: |
+        chmod +x ./docker-volume-snapshot ./integration-test.sh
+        ./integration-test.sh
+    
+    - name: Verify script syntax
+      run: |
+        bash -n ./docker-volume-snapshot
+        bash -n ./test.sh
+        bash -n ./integration-test.sh
+    
+    - name: Test help output
+      run: |
+        ./docker-volume-snapshot || echo "Help output displayed as expected"
